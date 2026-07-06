@@ -10,6 +10,7 @@ export interface ControlBarCallbacks {
 export class ControlBar {
   readonly root: HTMLElement;
   private autoBtn: HTMLButtonElement;
+  private shutterBtn: HTMLButtonElement;
 
   constructor(cb: ControlBarCallbacks) {
     this.autoBtn = el('button', {
@@ -22,9 +23,10 @@ export class ControlBar {
       className: 'shutter',
       text: '📷',
       testId: 'control-bar-shutter-button',
-      attrs: { 'aria-label': '撮影' },
+      attrs: { 'aria-label': '連写撮影' },
       onClick: cb.onShutter,
     });
+    this.shutterBtn = shutter;
     const settings = el('button', {
       text: '⚙ 設定',
       testId: 'control-bar-settings-button',
@@ -37,5 +39,11 @@ export class ControlBar {
     this.autoBtn.textContent = running ? '自動撮影を停止' : '自動撮影を開始';
     this.autoBtn.classList.toggle('danger', running);
     this.autoBtn.classList.toggle('primary', !running);
+  }
+
+  /** 連写中の進捗表示(例: "3/8")。null で📷に戻す。 */
+  setShutterProgress(text: string | null): void {
+    this.shutterBtn.textContent = text ?? '📷';
+    this.shutterBtn.disabled = text !== null;
   }
 }

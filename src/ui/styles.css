@@ -43,6 +43,8 @@ body {
 .retry-indicator:empty { display: none; }
 .engine-notice { color: var(--muted); }
 .engine-notice:empty { display: none; }
+.capture-info { color: var(--muted); font-family: ui-monospace, monospace; white-space: nowrap; }
+.capture-info:empty { display: none; }
 .count-badge { margin-left: auto; color: var(--accent); font-weight: 600; white-space: nowrap; }
 
 /* コントロールバー */

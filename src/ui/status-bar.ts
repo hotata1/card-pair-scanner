@@ -5,22 +5,32 @@ export class StatusBar {
   readonly root: HTMLElement;
   private retry: HTMLElement;
   private notice: HTMLElement;
+  private info: HTMLElement;
   private badge: HTMLElement;
   private noticeTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.retry = el('span', { className: 'retry-indicator', testId: 'status-bar-retry-indicator' });
     this.notice = el('span', { className: 'engine-notice', testId: 'status-bar-engine-notice' });
+    this.info = el('span', { className: 'capture-info', testId: 'status-bar-capture-info' });
     this.badge = el('span', { className: 'count-badge', testId: 'status-bar-count-badge' });
-    this.root = el('div', { className: 'status-bar' }, this.retry, this.notice, this.badge);
-    this.setLowConfidenceCount(0);
+    this.root = el('div', { className: 'status-bar' }, this.retry, this.notice, this.info, this.badge);
     this.setRecordCount(0);
   }
 
-  /** 直近フレームの「読めていないカード」数(BR-U2-7: 0で自動消灯)。 */
-  setLowConfidenceCount(count: number): void {
-    this.retry.textContent =
-      count > 0 ? `読めていないカードが${count}枚あります — 近づく・明るくすると読み取りやすくなります` : '';
+  /**
+   * 撮影ごとのフィードバック(BR-U2-7拡張)。
+   * 「撮ったのに何も起きない」を防ぐため、検出0枚も含めて毎回必ず何かを表示する。
+   */
+  setFrameFeedback(cardCount: number, lowCount: number, addedCount: number): void {
+    this.info.textContent = `検出${cardCount} 新規+${addedCount}`;
+    if (cardCount === 0) {
+      this.retry.textContent = 'カードが見つかりません — カード画面だけが大きく映るように近づいてください';
+    } else if (lowCount > 0) {
+      this.retry.textContent = `読めていないカードが${lowCount}枚あります — 近づく・明るくすると読み取りやすくなります`;
+    } else {
+      this.retry.textContent = '';
+    }
   }
 
   /** フォールバック等の一時通知(数秒で消える)。 */

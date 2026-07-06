@@ -66,7 +66,12 @@ async function bootstrap(): Promise<void> {
       }
       controlBar.setAutoRunning(controller.autoRunning);
     },
-    onShutter: () => void controller.captureOnce(),
+    // シャッター1回 = 8枚/4秒の連写(点滅する数字を周期をまたいで捕捉する)
+    onShutter: () => {
+      void controller
+        .captureBurst(8, 4000, (done, total) => controlBar.setShutterProgress(`${done}/${total}`))
+        .finally(() => controlBar.setShutterProgress(null));
+    },
     onSettings: () => settingsPanel.open(settingsStore.get()),
   });
   app.replaceChildren(cameraView.root, statusBar.root, controlBar.root, resultsPanel.root);
@@ -74,7 +79,8 @@ async function bootstrap(): Promise<void> {
   // 撮影制御
   const onOutcome = (outcome: FrameOutcome): void => {
     cameraView.renderOverlay(outcome);
-    statusBar.setLowConfidenceCount(outcome.lowConfidence.length); // BR-U2-7
+    // BR-U2-7拡張: 検出0枚も含め毎撮影後に必ずフィードバックを出す
+    statusBar.setFrameFeedback(outcome.cardCount, outcome.lowConfidence.length, outcome.added.length);
   };
   const controller = new CaptureController(
     () => cameraView.grabFrame(),

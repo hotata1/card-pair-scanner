@@ -104,6 +104,54 @@ describe('CaptureController(例示)', () => {
     expect(outcomes.length).toBe(0);
   });
 
+  it('連写撮影は指定枚数分の結果を直列で発行する', async () => {
+    const store = new RecordStore();
+    await store.init(() => Promise.reject(new Error('memory-only')));
+    const registry = new EngineRegistry();
+    let inFlight = 0;
+    let maxInFlight = 0;
+    registry.register({
+      kind: 'template',
+      ready: true,
+      init: async () => {},
+      recognize: async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 2));
+        inFlight--;
+        return { candidates: [], lowConfidence: [], cardCount: 0 };
+      },
+      dispose: () => {},
+    });
+    const service = new RecognitionService(registry, store, 0.65);
+    await service.setEngine('template');
+    const outcomes: FrameOutcome[] = [];
+    const controller = new CaptureController(() => frame, service, 1000, (o) => outcomes.push(o));
+
+    const progress: number[] = [];
+    await controller.captureBurst(8, 80, (done) => progress.push(done)); // テストでは短スパンで実行
+    expect(outcomes.length).toBe(8);
+    expect(progress).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(maxInFlight).toBe(1); // 連写中も直列(BR-U2-10)
+    expect(controller.burstRunning).toBe(false);
+  });
+
+  it('連写中の多重起動は無視される', async () => {
+    const store = new RecordStore();
+    await store.init(() => Promise.reject(new Error('memory-only')));
+    const registry = new EngineRegistry();
+    registry.register(stubRecognizer([]));
+    const service = new RecognitionService(registry, store, 0.65);
+    await service.setEngine('template');
+    const outcomes: FrameOutcome[] = [];
+    const controller = new CaptureController(() => frame, service, 1000, (o) => outcomes.push(o));
+
+    const first = controller.captureBurst(4, 40);
+    const second = controller.captureBurst(4, 40); // 実行中 → 即return
+    await Promise.all([first, second]);
+    expect(outcomes.length).toBe(4);
+  });
+
   it('認識中の例外はフレーム単位で隔離される(R-2)', async () => {
     const store = new RecordStore();
     await store.init(() => Promise.reject(new Error('memory-only')));

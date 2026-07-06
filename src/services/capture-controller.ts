@@ -12,6 +12,7 @@ export class CaptureController {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private queue: Promise<void> = Promise.resolve();
   private running = false;
+  private bursting = false;
   private intervalMs: number;
 
   constructor(
@@ -51,6 +52,38 @@ export class CaptureController {
   /** 手動シャッター。自動モードのON/OFFに関わらず使用可(US-05)。 */
   captureOnce(): Promise<void> {
     return this.enqueue();
+  }
+
+  get burstRunning(): boolean {
+    return this.bursting;
+  }
+
+  /**
+   * 連写撮影: spanMs の間に count 枚を等間隔で撮影する(既定 8枚/4秒)。
+   * 数字は点滅するため、1枚では消灯中のペアを拾えない — 点滅周期をまたぐ
+   * 連写で取りこぼしを減らす(FR-2.6の実カメラ対応)。
+   */
+  async captureBurst(
+    count = 8,
+    spanMs = 4000,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
+    if (this.bursting) return; // 連写中の多重起動は無視
+    this.bursting = true;
+    const gap = count > 1 ? spanMs / (count - 1) : 0;
+    try {
+      for (let i = 0; i < count; i++) {
+        const t0 = Date.now();
+        await this.enqueue();
+        onProgress?.(i + 1, count);
+        const remain = gap - (Date.now() - t0);
+        if (i < count - 1 && remain > 0) {
+          await new Promise((r) => setTimeout(r, remain));
+        }
+      }
+    } finally {
+      this.bursting = false;
+    }
   }
 
   private scheduleNext(delay: number): void {
