@@ -1,0 +1,104 @@
+/* card-pair-scanner — モバイルファースト 1画面UI */
+:root {
+  --bg: #101410;
+  --panel: #1c221c;
+  --panel-2: #262e26;
+  --text: #e8ede8;
+  --muted: #9aa89a;
+  --accent: #4caf50;
+  --warn: #ffa726;
+  --danger: #e05555;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  overscroll-behavior: none;
+}
+
+#app { display: flex; flex-direction: column; height: 100dvh; }
+
+/* カメラビュー */
+.camera-view { position: relative; flex: 1; min-height: 0; background: #000; overflow: hidden; }
+.camera-view canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+}
+.permission-notice {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px;
+  align-items: center; justify-content: center; text-align: center;
+  background: rgba(16, 20, 16, 0.92); padding: 24px; font-size: 15px; line-height: 1.7;
+}
+.permission-notice button { font-size: 15px; }
+
+/* ステータスバー(常設インジケータ) */
+.status-bar {
+  display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+  background: var(--panel); font-size: 13px; min-height: 34px;
+}
+.retry-indicator { color: var(--warn); }
+.retry-indicator:empty { display: none; }
+.engine-notice { color: var(--muted); }
+.engine-notice:empty { display: none; }
+.count-badge { margin-left: auto; color: var(--accent); font-weight: 600; white-space: nowrap; }
+
+/* コントロールバー */
+.control-bar {
+  display: flex; gap: 10px; padding: 10px 12px; background: var(--panel);
+  align-items: center; justify-content: center;
+}
+button {
+  font: inherit; color: var(--text); background: var(--panel-2);
+  border: 1px solid #3a443a; border-radius: var(--radius); padding: 10px 16px;
+  cursor: pointer; touch-action: manipulation;
+}
+button:active { transform: scale(0.97); }
+button.primary { background: var(--accent); color: #08130a; font-weight: 700; }
+button.danger { background: var(--danger); color: #fff; }
+button.shutter {
+  width: 64px; height: 64px; border-radius: 50%; font-size: 24px; padding: 0;
+  background: #fff; color: #111; font-weight: 700;
+}
+
+/* 一覧(下部シート) */
+.results-panel {
+  background: var(--panel); border-top: 1px solid #333c33;
+  max-height: 32dvh; overflow-y: auto; padding: 6px 12px 12px;
+}
+.pair-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pair-row {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel-2); border-radius: 8px; padding: 4px 6px 4px 10px;
+  font-family: ui-monospace, monospace; font-size: 15px;
+}
+.pair-row.corrected { outline: 1px dashed var(--warn); }
+.pair-row .row-btn {
+  padding: 2px 7px; font-size: 13px; border-radius: 6px; border: none; background: transparent; color: var(--muted);
+}
+.pair-row .row-btn:active { color: var(--text); }
+.empty-state { color: var(--muted); text-align: center; padding: 16px 8px; font-size: 14px; line-height: 1.7; }
+
+/* モーダル共通 */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px;
+}
+.modal {
+  background: var(--panel); border-radius: var(--radius); padding: 20px;
+  width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px;
+}
+.modal h2 { margin: 0; font-size: 17px; }
+.modal .row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.modal .actions { display: flex; gap: 10px; justify-content: flex-end; }
+.modal label { font-size: 14px; color: var(--muted); }
+.modal input[type="range"] { flex: 1; }
+.modal input[type="text"], .modal select {
+  font: inherit; background: var(--panel-2); color: var(--text);
+  border: 1px solid #3a443a; border-radius: 8px; padding: 8px 10px; width: 100%;
+}
+.conflict-notice { color: var(--danger); font-size: 13px; min-height: 1.2em; }
+.value-label { font-family: ui-monospace, monospace; color: var(--text); min-width: 3.5em; text-align: right; }
+.divider { border-top: 1px solid #333c33; margin: 4px 0; }
