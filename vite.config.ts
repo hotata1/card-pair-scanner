@@ -52,6 +52,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         harness: resolve(__dirname, 'harness.html'), // 開発ハーネス(精度検証用)
+        display: resolve(__dirname, 'display.html'), // 表示用シミュレータ(実カメラテスト用)
       },
     },
   },
