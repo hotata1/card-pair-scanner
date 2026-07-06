@@ -18,6 +18,11 @@ export class StatusBar {
     this.setRecordCount(0);
   }
 
+  /** エラーを目立つ位置(オレンジのインジケータ枠)に表示。次の撮影フィードバックで上書きされる。 */
+  showError(message: string): void {
+    this.retry.textContent = `⚠ ${message}`;
+  }
+
   /**
    * 撮影ごとのフィードバック(BR-U2-7拡張)。
    * 「撮ったのに何も起きない」を防ぐため、検出0枚も含めて毎回必ず何かを表示する。

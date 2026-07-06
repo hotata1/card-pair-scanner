@@ -98,7 +98,11 @@ export class CaptureController {
     this.queue = this.queue.then(async () => {
       try {
         const frame = this.grabFrame();
-        if (!frame) return;
+        if (!frame) {
+          // 無言で捨てると「押しても何も起きない」ように見える — 理由を通知する
+          this.onError(new Error('カメラのフレームを取得できませんでした'));
+          return;
+        }
         const outcome = await this.service.processFrame(frame);
         this.onOutcome(outcome);
       } catch (err) {

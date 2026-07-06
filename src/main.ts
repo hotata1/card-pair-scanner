@@ -72,10 +72,18 @@ async function bootstrap(): Promise<void> {
     },
     // シャッター1回 = 8枚/4秒の連写(点滅する数字を周期をまたいで捕捉する)
     onShutter: () => {
-      navigator.vibrate?.(50); // Androidでは押下を振動で通知(iOSは非対応)
-      void controller
-        .captureBurst(8, 4000, (done, total) => controlBar.setShutterProgress(`${done}/${total}`))
-        .finally(() => controlBar.setShutterProgress(null));
+      try {
+        // タップが処理された瞬間に必ず表示を変える(押下自体の生存確認)
+        controlBar.setShutterProgress('0/8');
+        navigator.vibrate?.(50); // Androidでは押下を振動で通知(iOSは非対応)
+        void controller
+          .captureBurst(8, 4000, (done, total) => controlBar.setShutterProgress(`${done}/${total}`))
+          .catch((err) => statusBar.showError(`連写失敗: ${err instanceof Error ? err.message : String(err)}`))
+          .finally(() => controlBar.setShutterProgress(null));
+      } catch (err) {
+        statusBar.showError(`シャッター処理失敗: ${err instanceof Error ? err.message : String(err)}`);
+        controlBar.setShutterProgress(null);
+      }
     },
     onSettings: () => settingsPanel.open(settingsStore.get()),
   });
@@ -95,9 +103,16 @@ async function bootstrap(): Promise<void> {
     // フレーム処理の失敗を無言にしない: 画面に理由を出す(実機診断用)
     (err) => {
       console.error('frame failed:', err);
-      statusBar.showNotice(`処理エラー: ${err instanceof Error ? err.message : String(err)}`, 10000);
+      statusBar.showError(`処理エラー: ${err instanceof Error ? err.message : String(err)}`);
     },
   );
+
+  // 想定外の例外・Promise拒否もすべて画面に出す(実機にコンソールがないため)
+  window.addEventListener('error', (ev) => statusBar.showError(`エラー: ${ev.message}`));
+  window.addEventListener('unhandledrejection', (ev) => {
+    const r = (ev as PromiseRejectionEvent).reason;
+    statusBar.showError(`エラー: ${r instanceof Error ? r.message : String(r)}`);
+  });
 
   // 記録購読 → 一覧・件数
   recordStore.onChange((records) => {
