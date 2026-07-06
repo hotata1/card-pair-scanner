@@ -41,11 +41,15 @@ async function bootstrap(): Promise<void> {
   // UI構築
   const cameraView = new CameraView();
   const statusBar = new StatusBar();
-  const settingsPanel = new SettingsPanel({
-    onChange: (patch) => settingsStore.save(patch),
-    onClearAll: () => recordStore.clear(),
-    getRecordCount: () => recordStore.size,
-  });
+  const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+  const settingsPanel = new SettingsPanel(
+    {
+      onChange: (patch) => settingsStore.save(patch),
+      onClearAll: () => recordStore.clear(),
+      getRecordCount: () => recordStore.size,
+    },
+    appVersion,
+  );
   const resultsPanel = new ResultsPanel({
     onEdit: (record: PairRecord) => {
       void editDialog(record, (v) => recordStore.update(record.id, v.letter, v.digits));
@@ -68,6 +72,7 @@ async function bootstrap(): Promise<void> {
     },
     // シャッター1回 = 8枚/4秒の連写(点滅する数字を周期をまたいで捕捉する)
     onShutter: () => {
+      navigator.vibrate?.(50); // Androidでは押下を振動で通知(iOSは非対応)
       void controller
         .captureBurst(8, 4000, (done, total) => controlBar.setShutterProgress(`${done}/${total}`))
         .finally(() => controlBar.setShutterProgress(null));
@@ -87,6 +92,11 @@ async function bootstrap(): Promise<void> {
     service,
     settingsStore.get().intervalMs,
     onOutcome,
+    // フレーム処理の失敗を無言にしない: 画面に理由を出す(実機診断用)
+    (err) => {
+      console.error('frame failed:', err);
+      statusBar.showNotice(`処理エラー: ${err instanceof Error ? err.message : String(err)}`, 10000);
+    },
   );
 
   // 記録購読 → 一覧・件数
@@ -129,7 +139,7 @@ async function bootstrap(): Promise<void> {
 
   // 4. エンジン初期化(フォールバック通知: R-1)
   const applyEngine = async (kind: Settings['engine']): Promise<void> => {
-    statusBar.showNotice(kind === 'tesseract' ? '認識エンジンを読み込み中…' : '', 3000);
+    if (kind === 'tesseract') statusBar.showNotice('認識エンジンを読み込み中…', 3000);
     const fallback = await service.setEngine(kind);
     if (fallback) {
       statusBar.showNotice('OCRエンジンを読み込めなかったため、標準エンジンで続行します');
@@ -147,7 +157,8 @@ async function bootstrap(): Promise<void> {
     lastSettings = s;
   });
 
-  // 5. 起動
+  // 5. 起動(バージョンを一時表示 — 旧キャッシュ版との判別用。常時表示は設定パネル)
+  statusBar.showNotice(`v${appVersion}`, 6000);
   await applyEngine(lastSettings.engine);
   await startSource(lastSettings.source);
 }

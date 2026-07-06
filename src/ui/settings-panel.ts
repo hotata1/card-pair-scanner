@@ -12,7 +12,10 @@ export interface SettingsPanelCallbacks {
 export class SettingsPanel {
   private backdrop: HTMLElement | null = null;
 
-  constructor(private cb: SettingsPanelCallbacks) {}
+  constructor(
+    private cb: SettingsPanelCallbacks,
+    private version = '',
+  ) {}
 
   open(settings: Settings): void {
     if (this.backdrop) return;
@@ -60,7 +63,7 @@ export class SettingsPanel {
       el(
         'div',
         { className: 'modal' },
-        el('h2', { text: '設定' }),
+        el('h2', { text: this.version ? `設定 (v${this.version})` : '設定', testId: 'settings-title' }),
         el('div', { className: 'row' }, el('label', { text: '自動撮影の間隔' }), interval, intervalLabel),
         el('div', { className: 'row' }, el('label', { text: '読み取りの厳しさ(信頼度閾値)' }), threshold, thLabel),
         el('div', { className: 'row' }, el('label', { text: '認識エンジン' }), engine),
