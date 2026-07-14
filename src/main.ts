@@ -4,6 +4,7 @@
  */
 import './ui/styles.css';
 import { registerSW } from 'virtual:pwa-register';
+import { CognitoAuth } from './auth/cognito-auth';
 import { CaptureController } from './services/capture-controller';
 import { RecognitionService, type FrameOutcome } from './services/recognition-service';
 import { CameraSource } from './sources/camera';
@@ -11,10 +12,12 @@ import { SimulatorSource } from './sources/simulator-source';
 import type { VideoSource } from './sources/types';
 import { RecordStore, type PairRecord } from './state/record-store';
 import { SettingsStore, type Settings } from './state/settings-store';
+import { AwsRecognizer } from './vision/aws/recognizer';
 import { CameraView } from './ui/camera-view';
 import { confirmDialog } from './ui/confirm-dialog';
 import { ControlBar } from './ui/control-bar';
 import { editDialog } from './ui/edit-dialog';
+import { renderLoginGate } from './ui/login-gate';
 import { ResultsPanel } from './ui/results-panel';
 import { SettingsPanel } from './ui/settings-panel';
 import { StatusBar } from './ui/status-bar';
@@ -26,6 +29,20 @@ import { TesseractRecognizer } from './vision/tesseract/recognizer';
 async function bootstrap(): Promise<void> {
   const app = document.getElementById('app')!;
 
+  // 0. ログインゲート(入口で堰き止め)。ドメイン/クライアントID未設定ならローカル開発用に無効化。
+  const auth = new CognitoAuth({
+    domain: import.meta.env.VITE_COGNITO_DOMAIN ?? '',
+    clientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? '',
+  });
+  if (auth.configured) {
+    await auth.handleRedirectCallback();
+    const token = await auth.getValidAccessToken();
+    if (!token) {
+      renderLoginGate(app, () => void auth.login());
+      return;
+    }
+  }
+
   // 1. 設定復元
   const settingsStore = new SettingsStore();
 
@@ -36,6 +53,14 @@ async function bootstrap(): Promise<void> {
   const registry = new EngineRegistry();
   registry.register(new TemplateRecognizer(createCanvasRasterizer()));
   registry.register(new TesseractRecognizer());
+  const awsEndpoint = import.meta.env.VITE_AWS_RECOGNIZE_URL;
+  const awsAvailable = Boolean(awsEndpoint && auth.configured);
+  if (awsAvailable) {
+    registry.register(new AwsRecognizer(awsEndpoint!, () => auth.getValidAccessToken()));
+  }
+  // 前回awsを選んでいても今回未提供なら未登録エラーを避けて標準エンジンへ戻す
+  if (!awsAvailable && settingsStore.get().engine === 'aws') settingsStore.save({ engine: 'template' });
+
   const service = new RecognitionService(registry, recordStore, settingsStore.get().confidenceThreshold);
 
   // UI構築
@@ -47,8 +72,10 @@ async function bootstrap(): Promise<void> {
       onChange: (patch) => settingsStore.save(patch),
       onClearAll: () => recordStore.clear(),
       getRecordCount: () => recordStore.size,
+      onLogout: auth.configured ? () => auth.logout() : undefined,
     },
     appVersion,
+    { awsAvailable },
   );
   const resultsPanel = new ResultsPanel({
     onEdit: (record: PairRecord) => {
@@ -154,7 +181,7 @@ async function bootstrap(): Promise<void> {
 
   // 4. エンジン初期化(フォールバック通知: R-1)
   const applyEngine = async (kind: Settings['engine']): Promise<void> => {
-    if (kind === 'tesseract') statusBar.showNotice('認識エンジンを読み込み中…', 3000);
+    if (kind === 'tesseract' || kind === 'aws') statusBar.showNotice('認識エンジンを読み込み中…', 3000);
     const fallback = await service.setEngine(kind);
     if (fallback) {
       statusBar.showNotice('OCRエンジンを読み込めなかったため、標準エンジンで続行します');

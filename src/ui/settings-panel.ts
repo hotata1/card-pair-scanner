@@ -6,6 +6,13 @@ export interface SettingsPanelCallbacks {
   onChange: (patch: Partial<Settings>) => void;
   onClearAll: () => Promise<void>;
   getRecordCount: () => number;
+  /** 設定済み(ログインゲート有効)の場合のみログアウトボタンを表示。 */
+  onLogout?: () => void;
+}
+
+export interface SettingsPanelOptions {
+  /** AWS(Rekognition)エンジンが利用可能(=エンドポイント設定済み)な場合のみ選択肢に出す。 */
+  awsAvailable?: boolean;
 }
 
 /** SettingsPanel: 設定モーダル(US-04/US-13)+全削除(Q5: A、2段階確認)。 */
@@ -15,6 +22,7 @@ export class SettingsPanel {
   constructor(
     private cb: SettingsPanelCallbacks,
     private version = '',
+    private opts: SettingsPanelOptions = {},
   ) {}
 
   open(settings: Settings): void {
@@ -42,6 +50,7 @@ export class SettingsPanel {
 
     const engine = el('select', { testId: 'settings-engine-select' });
     engine.append(new Option('テンプレート照合(推奨)', 'template'), new Option('Tesseract OCR(比較用)', 'tesseract'));
+    if (this.opts.awsAvailable) engine.append(new Option('AWS(Rekognition)', 'aws'));
     engine.value = settings.engine;
     engine.addEventListener('change', () => this.cb.onChange({ engine: engine.value as Settings['engine'] }));
 
@@ -56,6 +65,10 @@ export class SettingsPanel {
       testId: 'settings-clear-all-button',
       onClick: () => void this.clearAllFlow(),
     });
+
+    const logoutBtn = this.cb.onLogout
+      ? el('button', { text: 'ログアウト', testId: 'settings-logout-button', onClick: () => this.cb.onLogout!() })
+      : null;
 
     this.backdrop = el(
       'div',
@@ -73,6 +86,7 @@ export class SettingsPanel {
         el(
           'div',
           { className: 'actions' },
+          ...(logoutBtn ? [logoutBtn] : []),
           el('button', { className: 'primary', text: '閉じる', testId: 'settings-close-button', onClick: () => this.close() }),
         ),
       ),

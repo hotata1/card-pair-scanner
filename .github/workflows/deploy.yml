@@ -29,6 +29,10 @@ jobs:
       # テスト(PBT含む39件)。失敗時はデプロイしない。fast-checkのシードはログに出力される(PBT-08)
       - run: npm test
       - run: npm run build
+        env:
+          VITE_AWS_RECOGNIZE_URL: ${{ vars.VITE_AWS_RECOGNIZE_URL }}
+          VITE_COGNITO_DOMAIN: ${{ vars.VITE_COGNITO_DOMAIN }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.VITE_COGNITO_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

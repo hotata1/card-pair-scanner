@@ -38,7 +38,7 @@ export interface Component {
 }
 
 /** 認識エンジン種別。 */
-export type EngineKind = 'template' | 'tesseract';
+export type EngineKind = 'template' | 'tesseract' | 'aws';
 
 /** glyph分類結果。 */
 export interface Classified {

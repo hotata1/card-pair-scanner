@@ -39,7 +39,7 @@ export function normalizeSettings(raw: unknown): Settings {
       typeof o.confidenceThreshold === 'number' && Number.isFinite(o.confidenceThreshold)
         ? clamp(o.confidenceThreshold, 0.4, 0.9)
         : d.confidenceThreshold,
-    engine: o.engine === 'template' || o.engine === 'tesseract' ? o.engine : d.engine,
+    engine: o.engine === 'template' || o.engine === 'tesseract' || o.engine === 'aws' ? o.engine : d.engine,
     source: o.source === 'camera' || o.source === 'simulator' ? o.source : d.source,
   };
 }
