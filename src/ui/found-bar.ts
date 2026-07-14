@@ -8,6 +8,10 @@ export class FoundBar {
     this.root = el('div', { className: 'found-bar', testId: 'found-bar' });
   }
 
+  clear(): void {
+    this.root.replaceChildren();
+  }
+
   add(letter: string, digits: string): void {
     const row = el(
       'span',

@@ -95,14 +95,21 @@ async function bootstrap(): Promise<void> {
       })();
     },
   });
+  const foundBar = new FoundBar();
   const controlBar = new ControlBar({
-    onAutoToggle: () => {
-      if (controller.autoRunning) {
-        controller.stopAuto();
-      } else {
-        controller.startAuto(); // BR-U2-9: 明示操作でのみ開始
-      }
-      controlBar.setAutoRunning(controller.autoRunning);
+    // 繰り返しスキャン用: 記録した組と検索結果を一括で消して次の回に備える
+    onReset: () => {
+      void (async () => {
+        const count = recordStore.size;
+        if (count === 0) {
+          foundBar.clear();
+          return;
+        }
+        const ok = await confirmDialog('リセット', `記録した ${count}件 をすべて消して、次のスキャンを始めますか?`, 'リセットする');
+        if (!ok) return;
+        await recordStore.clear();
+        foundBar.clear();
+      })();
     },
     // シャッター1回 = 8枚/4秒の連写(点滅する数字を周期をまたいで捕捉する)
     onShutter: () => {
@@ -125,7 +132,6 @@ async function bootstrap(): Promise<void> {
   // 番号検索: 最大5件を同時に指定し、見つかるまで自動撮影を継続する
   let activeTargets = new Set<string>();
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
-  const foundBar = new FoundBar();
   // 検索の後始末を1箇所に集約(ボタン停止・全件発見・タイムアウトのいずれからも呼ぶ)
   function endSearch(): void {
     if (searchTimer !== null) {
@@ -135,7 +141,6 @@ async function bootstrap(): Promise<void> {
     activeTargets = new Set();
     controller.stopAuto();
     controller.setInterval(settingsStore.get().intervalMs); // 検索中の変更があってもここで最新値に戻す
-    controlBar.setAutoRunning(false);
     controlBar.setSearchLock(false);
     searchBar.setSearching(false);
   }

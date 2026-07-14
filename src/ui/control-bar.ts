@@ -1,24 +1,24 @@
 import { el } from './dom';
 
 export interface ControlBarCallbacks {
-  onAutoToggle: () => void;
   onShutter: () => void;
+  onReset: () => void;
   onSettings: () => void;
 }
 
-/** ControlBar: 自動撮影トグル+手動シャッター+設定(US-04/US-05)。 */
+/** ControlBar: 手動シャッター(連写)+記録リセット+設定。 */
 export class ControlBar {
   readonly root: HTMLElement;
-  private autoBtn: HTMLButtonElement;
   private shutterBtn: HTMLButtonElement;
+  private resetBtn: HTMLButtonElement;
 
   constructor(cb: ControlBarCallbacks) {
-    this.autoBtn = el('button', {
-      className: 'primary',
-      text: '自動撮影を開始',
-      testId: 'control-bar-auto-toggle-button',
-      onClick: cb.onAutoToggle,
+    const reset = el('button', {
+      text: 'リセット',
+      testId: 'control-bar-reset-button',
+      onClick: cb.onReset,
     });
+    this.resetBtn = reset;
     const shutter = el('button', {
       className: 'shutter',
       text: '📷',
@@ -32,13 +32,7 @@ export class ControlBar {
       testId: 'control-bar-settings-button',
       onClick: cb.onSettings,
     });
-    this.root = el('div', { className: 'control-bar' }, this.autoBtn, shutter, settings);
-  }
-
-  setAutoRunning(running: boolean): void {
-    this.autoBtn.textContent = running ? '自動撮影を停止' : '自動撮影を開始';
-    this.autoBtn.classList.toggle('danger', running);
-    this.autoBtn.classList.toggle('primary', !running);
+    this.root = el('div', { className: 'control-bar' }, reset, shutter, settings);
   }
 
   /** 連写中の進捗表示(例: "3/8")。null で📷に戻す。 */
@@ -47,9 +41,9 @@ export class ControlBar {
     this.shutterBtn.disabled = text !== null;
   }
 
-  /** 番号検索中は自動撮影/連写と状態が競合するため操作を止める。 */
+  /** 番号検索中は連写/リセットと状態が競合するため操作を止める。 */
   setSearchLock(locked: boolean): void {
-    this.autoBtn.disabled = locked;
     this.shutterBtn.disabled = locked;
+    this.resetBtn.disabled = locked;
   }
 }
