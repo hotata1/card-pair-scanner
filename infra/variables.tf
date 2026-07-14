@@ -3,10 +3,10 @@ variable "aws_region" {
   default = "ap-northeast-1"
 }
 
-variable "allowed_origin" {
-  description = "PWA配信元(CORS許可オリジン)"
-  type        = string
-  default     = "https://hotata1.github.io"
+variable "allowed_origins" {
+  description = "PWA配信元(CORS許可オリジン、複数可)。ローカル開発時のダブルチェック用にlocalhostも含める"
+  type        = list(string)
+  default     = ["https://hotata1.github.io", "http://localhost:5173"]
 }
 
 variable "budget_alert_email" {

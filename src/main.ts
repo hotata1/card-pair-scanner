@@ -17,14 +17,21 @@ import { CameraView } from './ui/camera-view';
 import { confirmDialog } from './ui/confirm-dialog';
 import { ControlBar } from './ui/control-bar';
 import { editDialog } from './ui/edit-dialog';
+import { FoundBar } from './ui/found-bar';
 import { renderLoginGate } from './ui/login-gate';
 import { ResultsPanel } from './ui/results-panel';
+import { SearchBar } from './ui/search-bar';
 import { SettingsPanel } from './ui/settings-panel';
 import { StatusBar } from './ui/status-bar';
 import { EngineRegistry } from './vision/registry';
 import { createCanvasRasterizer } from './vision/template/rasterize';
 import { TemplateRecognizer } from './vision/template/recognizer';
 import { TesseractRecognizer } from './vision/tesseract/recognizer';
+
+// 番号検索中の撮影間隔。AWSエンジンはRekognition呼び出しごとに課金されるため1〜2秒に1回へ抑える。
+const SEARCH_INTERVAL_MS = 1500;
+// 検索の自動停止までの時間。止め忘れ放置による想定外課金を防ぐコスト保護(US要望)。
+const SEARCH_TIMEOUT_MS = 180000; // 3分
 
 async function bootstrap(): Promise<void> {
   const app = document.getElementById('app')!;
@@ -114,13 +121,67 @@ async function bootstrap(): Promise<void> {
     },
     onSettings: () => settingsPanel.open(settingsStore.get()),
   });
-  app.replaceChildren(cameraView.root, statusBar.root, controlBar.root, resultsPanel.root);
+
+  // 番号検索: 最大5件を同時に指定し、見つかるまで自動撮影を継続する
+  let activeTargets = new Set<string>();
+  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  const foundBar = new FoundBar();
+  // 検索の後始末を1箇所に集約(ボタン停止・全件発見・タイムアウトのいずれからも呼ぶ)
+  function endSearch(): void {
+    if (searchTimer !== null) {
+      clearTimeout(searchTimer);
+      searchTimer = null;
+    }
+    activeTargets = new Set();
+    controller.stopAuto();
+    controller.setInterval(settingsStore.get().intervalMs); // 検索中の変更があってもここで最新値に戻す
+    controlBar.setAutoRunning(false);
+    controlBar.setSearchLock(false);
+    searchBar.setSearching(false);
+  }
+  const searchBar = new SearchBar({
+    onStart: (targets) => {
+      activeTargets = new Set(targets);
+      controller.setInterval(SEARCH_INTERVAL_MS);
+      controlBar.setSearchLock(true);
+      controller.startAuto();
+      // コスト保護: 一定時間見つからなければ自動停止(止め忘れ放置対策)
+      if (searchTimer !== null) clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        endSearch();
+        statusBar.showNotice(`${SEARCH_TIMEOUT_MS / 60000}分間見つからなかったため検索を自動停止しました`, 8000);
+      }, SEARCH_TIMEOUT_MS);
+    },
+    onStop: () => endSearch(),
+  });
+
+  app.replaceChildren(
+    cameraView.root,
+    statusBar.root,
+    searchBar.root,
+    controlBar.root,
+    foundBar.root,
+    resultsPanel.root,
+  );
 
   // 撮影制御
   const onOutcome = (outcome: FrameOutcome): void => {
     cameraView.renderOverlay(outcome);
     // BR-U2-7拡張: 検出0枚も含め毎撮影後に必ずフィードバックを出す
     statusBar.setFrameFeedback(outcome.cardCount, outcome.lowConfidence.length, outcome.added.length);
+
+    if (activeTargets.size > 0) {
+      for (const c of outcome.accepted) {
+        if (!activeTargets.has(c.digits)) continue;
+        activeTargets.delete(c.digits);
+        foundBar.add(c.letter, c.digits);
+        searchBar.markFound(c.digits); // 全件見つかれば内部で検索終了(onStop)を呼ぶ
+        navigator.vibrate?.([60, 40, 60]);
+      }
+      if (activeTargets.size > 0 && outcome.lowConfidence.some((c) => activeTargets.has(c.digits))) {
+        statusBar.showNotice('対象の番号を検出しました。文字が読み取れるまでそのまま構えてください', 2000);
+      }
+    }
   };
   const controller = new CaptureController(
     () => cameraView.grabFrame(),
@@ -192,7 +253,7 @@ async function bootstrap(): Promise<void> {
   // 設定変更の反映
   let lastSettings = settingsStore.get();
   settingsStore.onChange((s) => {
-    controller.setInterval(s.intervalMs);
+    if (activeTargets.size === 0) controller.setInterval(s.intervalMs); // 検索中は専用間隔を維持
     service.setConfidenceThreshold(s.confidenceThreshold);
     if (s.engine !== lastSettings.engine) void applyEngine(s.engine);
     if (s.source !== lastSettings.source) void startSource(s.source);

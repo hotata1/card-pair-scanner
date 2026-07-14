@@ -1,7 +1,13 @@
-import { DEFAULT_CONFIG, type PipelineConfig } from '../config';
 import { FrameScaler } from '../preprocess/scaler';
 import type { PairCandidate, Rect, Recognizer, RecognitionResult, RgbaImage } from '../types';
 import { isValidDigits, isValidLetter } from '../types';
+
+// AWS(Rekognition)は文字が大きく写るほど読めるため、ローカルエンジンの処理解像度上限
+// (1280x720)より高い解像度で送る。Rekognitionの課金は画像枚数ベースで解像度に依らない。
+// 上限はRekognition DetectTextのBytes制限(5MB)内に収まるサイズ(JPEG品質込みで余裕あり)。
+const AWS_MAX_WIDTH = 1920;
+const AWS_MAX_HEIGHT = 1920;
+const AWS_JPEG_QUALITY = 0.92;
 
 interface ApiCandidate {
   letter: string;
@@ -30,9 +36,8 @@ export class AwsRecognizer implements Recognizer {
   constructor(
     private endpoint: string,
     private getAccessToken: () => Promise<string | null>,
-    cfg: PipelineConfig = DEFAULT_CONFIG,
   ) {
-    this.scaler = new FrameScaler(cfg.maxProcessWidth, cfg.maxProcessHeight);
+    this.scaler = new FrameScaler(AWS_MAX_WIDTH, AWS_MAX_HEIGHT);
     this.canvas = document.createElement('canvas');
   }
 
@@ -94,7 +99,7 @@ export class AwsRecognizer implements Recognizer {
     this.canvas.height = img.height;
     const ctx = this.canvas.getContext('2d')!;
     ctx.putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
-    const dataUrl = this.canvas.toDataURL('image/jpeg', 0.85);
+    const dataUrl = this.canvas.toDataURL('image/jpeg', AWS_JPEG_QUALITY);
     return dataUrl.slice(dataUrl.indexOf(',') + 1);
   }
 }

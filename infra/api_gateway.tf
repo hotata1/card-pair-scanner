@@ -3,7 +3,7 @@ resource "aws_apigatewayv2_api" "recognize" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = [var.allowed_origin]
+    allow_origins = var.allowed_origins
     allow_methods = ["POST", "OPTIONS"]
     allow_headers = ["content-type", "authorization"]
     max_age       = 300

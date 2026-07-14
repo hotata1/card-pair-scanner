@@ -46,4 +46,10 @@ export class ControlBar {
     this.shutterBtn.textContent = text ?? '📷';
     this.shutterBtn.disabled = text !== null;
   }
+
+  /** 番号検索中は自動撮影/連写と状態が競合するため操作を止める。 */
+  setSearchLock(locked: boolean): void {
+    this.autoBtn.disabled = locked;
+    this.shutterBtn.disabled = locked;
+  }
 }

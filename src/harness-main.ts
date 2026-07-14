@@ -2,8 +2,10 @@
  * Unit 1 開発ハーネス(CG-10): シミュレータ映像を認識し、検出枠・ペア候補・
  * 処理時間を表示する最小ページ。本番UIは Unit 2 (app-shell) で実装する。
  */
+import { CognitoAuth } from './auth/cognito-auth';
 import { aggregateReports, scoreAgainstTruth, type AccuracyReport } from './harness/accuracy';
 import { SimulatorSource } from './sources/simulator-source';
+import { AwsRecognizer } from './vision/aws/recognizer';
 import { PerfMeter } from './vision/perf';
 import { EngineRegistry } from './vision/registry';
 import { createCanvasRasterizer } from './vision/template/rasterize';
@@ -12,6 +14,9 @@ import { TesseractRecognizer } from './vision/tesseract/recognizer';
 import type { EngineKind, PairCandidate, Recognizer, RgbaImage } from './vision/types';
 
 const SIM_SEED = 42;
+// AWSエンジンはRekognition呼び出しごとに課金されるため、比較テスト中も呼び出し間隔を抑える
+const AWS_TICK_MS = 1500;
+const DEFAULT_TICK_MS = 250;
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const statusEl = document.getElementById('status')!;
@@ -28,6 +33,19 @@ const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 const registry = new EngineRegistry();
 registry.register(new TemplateRecognizer(createCanvasRasterizer()));
 registry.register(new TesseractRecognizer());
+
+// index.html側のログインで既にトークンがあれば(同一オリジンのlocalStorage共有)そのまま使う。
+// 未ログインならawsは比較対象から外す(ハーネス自体にログインUIは持たせない)。
+const auth = new CognitoAuth({
+  domain: import.meta.env.VITE_COGNITO_DOMAIN ?? '',
+  clientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? '',
+});
+const awsEndpoint = import.meta.env.VITE_AWS_RECOGNIZE_URL;
+const awsAvailable = Boolean(awsEndpoint && auth.configured);
+if (awsAvailable) {
+  registry.register(new AwsRecognizer(awsEndpoint!, () => auth.getValidAccessToken()));
+}
+const ENGINE_CYCLE: EngineKind[] = awsAvailable ? ['template', 'tesseract', 'aws'] : ['template', 'tesseract'];
 
 const perf = new PerfMeter();
 perf.enabled = true;
@@ -46,10 +64,14 @@ async function selectEngine(kind: EngineKind): Promise<void> {
   engineKind = sel.recognizer.kind;
   btnEngine.textContent = `engine: ${engineKind}`;
   statusEl.textContent = sel.fallbackReason ? `fallback→template (${sel.fallbackReason})` : 'ready';
+  // エンジン切替後の集計に前エンジンの結果を混ぜない(精度比較の公平性のため)
+  reports.length = 0;
+  seenPairs.clear();
 }
 
 btnEngine.addEventListener('click', () => {
-  void selectEngine(engineKind === 'template' ? 'tesseract' : 'template');
+  const idx = ENGINE_CYCLE.indexOf(engineKind);
+  void selectEngine(ENGINE_CYCLE[(idx + 1) % ENGINE_CYCLE.length]);
 });
 btnPause.addEventListener('click', () => {
   paused = !paused;
@@ -127,7 +149,7 @@ async function bootstrap(): Promise<void> {
   // 前フレームの処理完了後に次を予約する方式(services.md の撮影ループ設計)。
   const loop = async (): Promise<void> => {
     await tick();
-    setTimeout(() => void loop(), 250);
+    setTimeout(() => void loop(), engineKind === 'aws' ? AWS_TICK_MS : DEFAULT_TICK_MS);
   };
   void loop();
 }

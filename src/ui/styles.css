@@ -47,6 +47,30 @@ body {
 .capture-info:empty { display: none; }
 .count-badge { margin-left: auto; color: var(--accent); font-weight: 600; white-space: nowrap; }
 
+/* 番号検索バー(最大5件同時) */
+.search-bar { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; background: var(--panel-2); }
+.search-bar-row { display: flex; gap: 8px; }
+.search-bar-row input {
+  flex: 1; font: inherit; background: var(--panel); color: var(--text);
+  border: 1px solid #3a443a; border-radius: 8px; padding: 8px 10px; min-width: 0;
+}
+.search-bar-row button { white-space: nowrap; }
+.search-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.search-chips:empty { display: none; }
+.search-chip {
+  display: flex; align-items: center; gap: 4px; background: var(--panel); border-radius: 8px;
+  padding: 4px 4px 4px 10px; font-family: ui-monospace, monospace; font-size: 14px;
+}
+
+/* 発見済み一覧(画面下部、控えめ表示) */
+.found-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px; }
+.found-bar:empty { display: none; }
+.found-chip {
+  display: flex; align-items: center; gap: 4px; background: var(--accent); color: #08130a;
+  border-radius: 8px; padding: 4px 4px 4px 10px; font-family: ui-monospace, monospace; font-size: 14px; font-weight: 700;
+}
+.found-chip .row-btn { color: #08130a; }
+
 /* コントロールバー */
 .control-bar {
   display: flex; gap: 10px; padding: 10px 12px; background: var(--panel);

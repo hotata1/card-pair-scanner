@@ -46,7 +46,7 @@ resource "aws_lambda_function" "recognize" {
 
   environment {
     variables = {
-      ALLOWED_ORIGIN = var.allowed_origin
+      ALLOWED_ORIGINS = join(",", var.allowed_origins)
     }
   }
 }
